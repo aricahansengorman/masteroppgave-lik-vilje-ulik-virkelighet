@@ -1,0 +1,148 @@
+# Her er det blitt benyttet Rstudio for å finne hvilke to kommuner, som er 
+# best egnet på bakgrunn av variablene, areal, økonomi, styringsmodell og 
+# befolkingstørrelse. Det er benyttet most similar systems for å finne
+# kommunene, hvor "økonomi" og "styringsmodell" holdes konstant, mens areal
+# skal være så lav forskjell som - det er her total_diff_4 kommer av da det
+# er totalt 4 kvadratkilometer som skiller de to kommunene. Befolkningstørrelse
+# skal ha så stor variasjon som mulig i dette datasettet. Resultatet viser at 
+# Drammen og Gjerstad kommune er de to kommunene som egner seg best.
+
+library(rvest)
+library(dplyr)
+library(stringr)
+
+
+fil1 <- "/Users/aricahansengorman/Downloads/12134_20251124-114110økonomi.htm"
+fil2 <- "/Users/aricahansengorman/Downloads/11342_20251124-133409areal.htm"
+fil3 <- "/Users/aricahansengorman/Downloads/11342_20251126-115038befolkingng2025.htm"
+
+
+df_okonomi <- read_html(fil1) %>% html_table(fill = TRUE) %>% .[[1]]
+df_areal   <- read_html(fil2) %>% html_table(fill = TRUE) %>% .[[1]]
+df_befolk  <- read_html(fil3) %>% html_table(fill = TRUE) %>% .[[1]]
+
+
+okonomi <- df_okonomi
+names(okonomi) <- c("Kommune", "Okonomi")
+
+okonomi <- okonomi %>%
+  filter(!grepl("Netto", Kommune),
+         !grepl("2024", Kommune),
+         Kommune != "") %>%
+  mutate(
+    Okonomi = as.numeric(
+      str_replace(
+        str_replace_all(as.character(Okonomi), "\\.", ""),
+        ",", "."
+      )
+    )
+  )
+
+
+areal <- df_areal
+names(areal) <- c("Kommune", "Areal")
+
+areal <- areal[-c(1,2), ] %>%
+  filter(Kommune != "") %>%
+  mutate(Areal = as.numeric(gsub("[ ,]", "", Areal)))
+
+
+befolk <- df_befolk
+names(befolk) <- c("Kommune", "Befolkning")
+
+befolk <- befolk[-c(1,2), ] %>%
+  filter(Kommune != "") %>%
+  mutate(Befolkning = as.numeric(gsub("[ ,]", "", Befolkning)))
+
+
+alle1 <- okonomi %>%
+  inner_join(areal, by = "Kommune") %>%
+  inner_join(befolk, by = "Kommune")
+
+
+alle1 <- alle1 %>%
+  mutate(Kommune = str_trim(str_replace(Kommune, "^[0-9]+\\s+", "")))
+
+# 
+alle1 <- alle1 %>%
+  filter(Befolkning <= 4999 | Befolkning >= 50000) %>%
+  mutate(
+    KommuneStorrelse = case_when(
+      Befolkning <= 4999  ~ "Liten kommune",
+      Befolkning >= 50000 ~ "Stor kommune"
+    )
+  )
+
+ 
+alle1 <- alle1 %>%
+  mutate(
+    Styringsmodell = case_when(
+      Kommune %in% c("Oslo", "Bergen", "Tromsø") ~ "Parlamentarisme",
+      TRUE ~ "Formannskapsmodell"
+    )
+  )
+
+par1 <- expand.grid(
+  Kommune1 = alle1$Kommune,
+  Kommune2 = alle1$Kommune,
+  stringsAsFactors = FALSE
+) %>%
+  filter(Kommune1 != Kommune2)
+
+
+par1 <- par1 %>%
+  left_join(
+    alle1 %>% rename(
+      Okonomi1 = Okonomi,
+      Areal1 = Areal,
+      Befolkning1 = Befolkning,
+      Storrelse1 = KommuneStorrelse,
+      Styringsmodell1 = Styringsmodell
+    ),
+    by = c("Kommune1" = "Kommune")
+  ) %>%
+  left_join(
+    alle1 %>% rename(
+      Okonomi2 = Okonomi,
+      Areal2 = Areal,
+      Befolkning2 = Befolkning,
+      Storrelse2 = KommuneStorrelse,
+      Styringsmodell2 = Styringsmodell
+    ),
+    by = c("Kommune2" = "Kommune")
+  )
+
+
+par1 <- par1 %>%
+  filter(Styringsmodell1 == Styringsmodell2)
+
+
+par1 <- par1 %>%
+  filter(Storrelse1 != Storrelse2)
+
+par1 <- par1 %>%
+  filter(Okonomi1 == Okonomi2)
+
+
+par1 <- par1 %>%
+  mutate(
+    diff_okonomi = abs(Okonomi1 - Okonomi2),
+    diff_areal   = abs(Areal1 - Areal2),
+    total_diff   = diff_okonomi + diff_areal
+  )
+
+
+par1 <- par1 %>%
+  filter(Kommune1 < Kommune2)
+
+
+most_similar <- par1 %>%
+  arrange(total_diff)
+
+
+head(most_similar, 15)
+
+# Ved hjelp av tabellen ser vi at de to kommunene som er best egnet er Drammen
+# og Gjerstad. Disse to kommunene har minst forskjell på strukturelle forhold,
+# samtidig som de har den største mulige variansen i befolkingstørrelse 
+# og vil derfor bli benyttet i studien. 
