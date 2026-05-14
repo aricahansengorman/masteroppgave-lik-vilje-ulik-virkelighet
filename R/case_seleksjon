@@ -12,10 +12,9 @@ library(dplyr)
 library(stringr)
 
 
-fil1 <- "/Users/aricahansengorman/Downloads/12134_20251124-114110økonomi.htm"
-fil2 <- "/Users/aricahansengorman/Downloads/11342_20251124-133409areal.htm"
-fil3 <- "/Users/aricahansengorman/Downloads/11342_20251126-115038befolkingng2025.htm"
-
+fil1 <- "data/okonomi.htm"
+fil2 <- "data/areal.htm"
+fil3 <- "data/befolkning.htm"
 
 df_okonomi <- read_html(fil1) %>% html_table(fill = TRUE) %>% .[[1]]
 df_areal   <- read_html(fil2) %>% html_table(fill = TRUE) %>% .[[1]]
