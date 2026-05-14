@@ -1,1 +1,6 @@
-# masteroppgave-lik-vilje-ulik-virkelighet
+
+
+# Masteroppgave: 
+
+Her er koden som begrunner valg av kommuner for analysen
+
